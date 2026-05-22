@@ -1,62 +1,108 @@
 const express = require("express");
-const mongoose = require("mongoose");
 const cors = require("cors");
 const multer = require("multer");
+
 const s3 = require("./s3");
-const upload = multer({ storage: multer.memoryStorage() });
+const db = require("./db");
 
 const app = express();
+
 app.use(cors());
 app.use(express.json());
 
-mongoose.connect("mongodb://mongo:27017/schoolDB");
-
-const Student = mongoose.model("Student", {
-  name: String,
-  gender: String,
-  father: String,
-  mother: String,
-  occupation: String,
-  school: String,
-  class: String,
-  photo: String   
+const upload = multer({
+  storage: multer.memoryStorage()
 });
+
+
+// =============================
+// ADD STUDENT API
+// =============================
 
 app.post("/addStudent", upload.single("photo"), async (req, res) => {
 
-  let photoUrl = "";
+  try {
 
-  if (req.file) {
-    const params = {
-      Bucket: "ferrari-bucket-ruby",
-      Key: Date.now() + "-" + req.file.originalname,
-      Body: req.file.buffer,
-      ContentType: req.file.mimetype
-    };
+    let photoUrl = "";
 
-    const result = await s3.upload(params).promise();
-    photoUrl = result.Location;
+    // Upload photo to S3
+    if (req.file) {
+
+      const params = {
+        Bucket: "ferrari-bucket-ruby",
+        Key: Date.now() + "-" + req.file.originalname,
+        Body: req.file.buffer,
+        ContentType: req.file.mimetype
+      };
+
+      const result = await s3.upload(params).promise();
+
+      photoUrl = result.Location;
+    }
+
+    // SQL Query
+    const sql = `
+      INSERT INTO students
+      (name, gender, father, mother, occupation, school, class, photo)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+
+    // Insert into RDS
+    db.query(
+      sql,
+      [
+        req.body.name,
+        req.body.gender,
+        req.body.father,
+        req.body.mother,
+        req.body.occupation,
+        req.body.school,
+        req.body.class,
+        photoUrl
+      ],
+      (err, result) => {
+
+        if (err) {
+          console.log(err);
+          res.status(500).send("DB Error");
+        } else {
+          res.send("Saved Successfully");
+        }
+      }
+    );
+
+  } catch (error) {
+
+    console.log(error);
+    res.status(500).send("Server Error");
   }
+});
 
-  const student = new Student({
-    name: req.body.name,
-    gender: req.body.gender,
-    father: req.body.father,
-    mother: req.body.mother,
-    occupation: req.body.occupation,
-    school: req.body.school,
-    class: req.body.class,
-    photo: photoUrl
+
+// =============================
+// GET ALL STUDENTS API
+// =============================
+
+app.get("/students", (req, res) => {
+
+  const sql = "SELECT * FROM students";
+
+  db.query(sql, (err, result) => {
+
+    if (err) {
+      console.log(err);
+      res.status(500).send("DB Error");
+    } else {
+      res.json(result);
+    }
   });
-
-  await student.save();
-
-  res.send("Saved with photo");
 });
 
-app.get("/students", async (req, res) => {
-  const data = await Student.find();
-  res.json(data);
-});
 
-app.listen(5000, () => console.log("Server running"));
+// =============================
+// SERVER START
+// =============================
+
+app.listen(5000, () => {
+  console.log("Server running on port 5000");
+});
