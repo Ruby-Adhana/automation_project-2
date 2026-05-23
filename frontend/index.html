@@ -107,84 +107,175 @@
 </table>
 
 <script>
+
+  const API_URL = "http://YOUR-ALB-DNS.ap-south-1.elb.amazonaws.com";
+
   const form = document.getElementById("admissionForm");
+
   const table = document.querySelector("#dataTable tbody");
 
   let students = [];
 
-  // 🔥 Load data from DB
-  async function loadData() {
-    const res = await fetch("http://13.126.73.168:5000/students");
-    const data = await res.json();
 
-    students = data;
-    displayData(students);
+  // ============================
+  // LOAD STUDENTS FROM BACKEND
+  // ============================
+
+  async function loadData() {
+
+    try {
+
+      const res = await fetch(`${API_URL}/students`);
+
+      const data = await res.json();
+
+      students = data;
+
+      displayData(students);
+
+    } catch (error) {
+
+      console.log("Load Error:", error);
+
+      alert("Failed to load students");
+    }
   }
 
-  // 🔥 Submit form → save to DB
-form.addEventListener("submit", async function(e) {
-  e.preventDefault();
 
-  const formData = new FormData();
+  // ============================
+  // SAVE STUDENT
+  // ============================
 
-  formData.append("name", document.getElementById("name").value);
-  formData.append("gender", document.getElementById("gender").value);
-  formData.append("father", document.getElementById("father").value);
-  formData.append("mother", document.getElementById("mother").value);
-  formData.append("occupation", document.getElementById("occupation").value);
-  formData.append("school", document.getElementById("school").value);
-  formData.append("class", document.getElementById("class").value);
+  form.addEventListener("submit", async function(e) {
 
-  const file = document.getElementById("photo").files[0];
-  formData.append("photo", file);
+    e.preventDefault();
 
-  await fetch("http://13.126.73.168:5000/addStudent", {
-    method: "POST",
-    body: formData
+    try {
+
+      const formData = new FormData();
+
+      formData.append("name", document.getElementById("name").value);
+
+      formData.append("gender", document.getElementById("gender").value);
+
+      formData.append("father", document.getElementById("father").value);
+
+      formData.append("mother", document.getElementById("mother").value);
+
+      formData.append("occupation", document.getElementById("occupation").value);
+
+      formData.append("school", document.getElementById("school").value);
+
+      formData.append("class", document.getElementById("class").value);
+
+      const file = document.getElementById("photo").files[0];
+
+      if (file) {
+        formData.append("photo", file);
+      }
+
+      const response = await fetch(`${API_URL}/addStudent`, {
+
+        method: "POST",
+
+        body: formData
+      });
+
+      if (!response.ok) {
+
+        throw new Error("Failed to save");
+      }
+
+      await loadData();
+
+      alert("Saved Successfully ✅");
+
+      form.reset();
+
+    } catch (error) {
+
+      console.log("Submit Error:", error);
+
+      alert("Failed To Save Student");
+    }
   });
 
-  await loadData();
 
-  alert("Saved with photo ✅");
-  form.reset();
-});
+  // ============================
+  // DISPLAY DATA
+  // ============================
 
   function displayData(data) {
+
     table.innerHTML = "";
 
     data.forEach(s => {
-      let row = `<tr>
-        <td>${s.name}</td>
-        <td>${s.gender}</td>
-        <td>${s.father}</td>
-        <td>${s.mother}</td>
-        <td>${s.occupation}</td>
-        <td>${s.school}</td>
-        <td>${s.class}</td>
-	<td><img src="${s.photo}" width="50"/></td>
-      </tr>`;
+
+      let row = `
+        <tr>
+          <td>${s.name}</td>
+          <td>${s.gender}</td>
+          <td>${s.father}</td>
+          <td>${s.mother}</td>
+          <td>${s.occupation}</td>
+          <td>${s.school}</td>
+          <td>${s.class}</td>
+
+          <td>
+            <img 
+              src="${s.photo}" 
+              width="60"
+              height="60"
+              style="object-fit:cover;border-radius:6px;"
+            />
+          </td>
+        </tr>
+      `;
+
       table.innerHTML += row;
     });
   }
 
-  // 🔥 Filter
-  document.getElementById("searchName").addEventListener("input", filterData);
-  document.getElementById("filterGender").addEventListener("change", filterData);
+
+  // ============================
+  // FILTER STUDENTS
+  // ============================
+
+  document.getElementById("searchName")
+    .addEventListener("input", filterData);
+
+  document.getElementById("filterGender")
+    .addEventListener("change", filterData);
+
 
   function filterData() {
-    let name = document.getElementById("searchName").value.toLowerCase();
-    let gender = document.getElementById("filterGender").value;
+
+    let name = document
+      .getElementById("searchName")
+      .value
+      .toLowerCase();
+
+    let gender = document
+      .getElementById("filterGender")
+      .value;
 
     let filtered = students.filter(s =>
+
       s.name.toLowerCase().includes(name) &&
+
       (gender === "" || s.gender === gender)
     );
 
     displayData(filtered);
   }
 
-  // 🔥 Load on page open
+
+  // ============================
+  // PAGE LOAD
+  // ============================
+
   loadData();
+
 </script>
 
 </body>
